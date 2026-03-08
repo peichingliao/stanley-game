@@ -707,12 +707,28 @@ function restartGame() {
   player.style.top  = curY + 'px';
   flipEl.style.transform = 'scaleX(1)';
 
-  container.addEventListener('mousemove', e => {
+  function clientToGame(clientX, clientY) {
     const r = container.getBoundingClientRect();
-    tgtX = e.clientX - r.left - 34;
-    tgtY = e.clientY - r.top  - 78;
+    const scaleX = 820 / r.width;
+    const scaleY = 510 / r.height;
+    return {
+      x: (clientX - r.left) * scaleX - 34,
+      y: (clientY - r.top)  * scaleY - 78,
+    };
+  }
+
+  container.addEventListener('mousemove', e => {
+    const pos = clientToGame(e.clientX, e.clientY);
+    tgtX = pos.x; tgtY = pos.y;
   });
   container.addEventListener('mouseleave', () => player.classList.remove('walking'));
+
+  container.addEventListener('touchmove', e => {
+    e.preventDefault();
+    const t = e.touches[0];
+    const pos = clientToGame(t.clientX, t.clientY);
+    tgtX = pos.x; tgtY = pos.y;
+  }, { passive: false });
 
   function tick() {
     curX += (tgtX - curX) * 0.13;
@@ -731,6 +747,38 @@ function restartGame() {
   requestAnimationFrame(tick);
 })();
 
+// ═══════════════════════════════════════════════════════════
+//  MOBILE SCALING — fit game container to viewport
+// ═══════════════════════════════════════════════════════════
+
+function scaleGameContainer() {
+  const container = document.getElementById('game-container');
+  const wrapper   = document.getElementById('game-wrapper');
+
+  // Reset to 100% so offsetWidth gives the actual available width
+  wrapper.style.width  = '';
+  wrapper.style.height = '';
+
+  // Reserve space for h1, hud, legend, paddings (~125px total)
+  const uiH    = 125;
+  const availW = wrapper.offsetWidth;          // real available width after CSS/padding
+  const scaleW = availW / 820;
+  const scaleH = (window.innerHeight - uiH) / 510;
+  const scale  = Math.min(1, scaleW, scaleH);
+
+  container.style.transform = scale < 1 ? `scale(${scale})` : '';
+  wrapper.style.width       = Math.round(820 * scale) + 'px';
+  wrapper.style.height      = Math.round(510 * scale) + 'px';
+}
+
+scaleGameContainer();
+window.addEventListener('resize', scaleGameContainer);
+
 // ── Start: show difficulty selection ──
 document.getElementById('difficulty-screen').classList.add('show');
 updateHUD();
+
+// ── Update legend text for touch devices ──
+if ('ontouchstart' in window) {
+  document.getElementById('map-legend').textContent = '點擊發光物件可找到秘密通道，點擊餅乾就能收集！';
+}
